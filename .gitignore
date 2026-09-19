@@ -1,0 +1,6 @@
+.venv/
+data/
+*.tar.bz2
+__pycache__/
+.ipynb_checkpoints/
+.env
