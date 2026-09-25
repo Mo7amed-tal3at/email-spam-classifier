@@ -5,3 +5,6 @@ data/raw/*
 __pycache__/
 .ipynb_checkpoints/
 .env
+mlflow.db
+mlruns/
+mlartifacts/
