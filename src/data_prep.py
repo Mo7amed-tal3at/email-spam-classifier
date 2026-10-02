@@ -46,14 +46,14 @@ def get_email_content(msg) -> str:
 class EmailToWordCountTransformer(BaseEstimator, TransformerMixin):
     def __init__(self, strip_headers=True, lowercase=True,
                  remove_punctuation=True, replace_urls=True,
-                 replace_numbers=True, do_stemming=True):
+                 replace_numbers=True, do_stemming=True,input_type="path"):
         self.strip_headers = strip_headers
         self.lowercase = lowercase
         self.remove_punctuation = remove_punctuation
         self.replace_urls = replace_urls
         self.replace_numbers = replace_numbers
         self.do_stemming = do_stemming
-
+        self.input_type = input_type
     def fit(self, X, y=None):
         return self
 
