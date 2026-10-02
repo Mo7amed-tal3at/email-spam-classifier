@@ -58,25 +58,28 @@ class EmailToWordCountTransformer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        if self.strip_headers:
-            contents = []
-            for path in X:
-                with open(path, encoding="latin1") as f:
+        contents = []
+        for item in X:
+            if self.input_type == "path":
+                with open(item, encoding="latin1") as f:
                     msg = email.message_from_file(f)
-                content = get_email_content(msg)
-                if self.lowercase:
-                    content = content.lower()
-                if self.replace_urls:
-                    content = re.sub(url_pattern, "URL", content)
-                if self.replace_numbers:
-                    content = re.sub(number_pattern, "NUMBER", content)
-                if self.remove_punctuation:
-                    content = re.sub(punctuation_pattern," ",content)
-                if self.do_stemming:
-                    content = ' '.join(map(stemmer.stem,content.split()))
-                word_count = Counter(content.split())  
-                contents.append(word_count)
-            return contents
+            else:  # "text"
+                msg = email.message_from_string(item)
+
+            content = get_email_content(msg)
+            if self.lowercase:
+                content = content.lower()
+            if self.replace_urls:
+                content = re.sub(url_pattern, "URL", content)
+            if self.replace_numbers:
+                content = re.sub(number_pattern, "NUMBER", content)
+            if self.remove_punctuation:
+                content = re.sub(punctuation_pattern, " ", content)
+            if self.do_stemming:
+                content = ' '.join(map(stemmer.stem, content.split()))
+            word_count = Counter(content.split())
+            contents.append(word_count)
+        return contents
 
 class WordCounterToVectorTransformer(BaseEstimator, TransformerMixin):
     def __init__(self, vocabulary_size=1000):
