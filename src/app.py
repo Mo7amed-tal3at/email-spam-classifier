@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from pydantic import BaseModel
 import  mlflow.sklearn
@@ -7,7 +8,9 @@ from pathlib import Path
 from data_prep import EmailToWordCountTransformer, WordCounterToVectorTransformer  # noqa: F401
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-mlflow.set_tracking_uri("http://127.0.0.1:5000")
+
+mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
+mlflow.set_tracking_uri(mlflow_uri)
 
 model_url = f"runs:/d21df9f766cb498bbbf4ce07d6a052bd/model"
 model = mlflow.sklearn.load_model(model_url)
