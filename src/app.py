@@ -5,7 +5,7 @@ import  mlflow.sklearn
 import mlflow.artifacts
 import joblib
 from pathlib import Path
-from data_prep import EmailToWordCountTransformer, WordCounterToVectorTransformer  # noqa: F401
+from data_prep import EmailToWordCountTransformer, WordCounterToVectorTransformer 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
