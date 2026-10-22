@@ -7,11 +7,18 @@ import mlflow.artifacts
 import joblib
 from pathlib import Path
 from data_prep import EmailToWordCountTransformer, WordCounterToVectorTransformer 
+import redis
+import json
+import hashlib
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
 mlflow.set_tracking_uri(mlflow_uri)
+
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+redis_client = redis.from_url(redis_url)
 
 model_url = f"runs:/d21df9f766cb498bbbf4ce07d6a052bd/model"
 model = mlflow.sklearn.load_model(model_url)
@@ -41,9 +48,16 @@ class PredictionResponse(BaseModel):
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: EmailRequest):
+    cache_key = hashlib.md5(request.text.encode()).hexdigest()
+    cached = redis_client.get(cache_key)
+    if cached:
+        return PredictionResponse(**json.loads(cached))
     vector = preprocess_pipeline.transform([request.text])
     prediction = model.predict(vector)[0]
-    return PredictionResponse(
+    response = PredictionResponse(
         label="spam" if prediction == 1 else "ham",
         is_spam=bool(prediction),
     )
+    redis_client.set(cache_key, json.dumps(response.model_dump()))
+    
+    return response

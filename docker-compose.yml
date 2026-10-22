@@ -7,11 +7,18 @@ services:
       - ./mlflow.db:/mlflow/mlflow.db
       - ./mlartifacts:/mlflow/mlartifacts
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    
   api:
     build: .
     ports:
       - "8000:8000"
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - mlflow
+      - redis
