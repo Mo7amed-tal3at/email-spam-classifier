@@ -1,6 +1,6 @@
 # Email Spam Classifier 📧
 
-A production-grade spam classification system built as a full MLOps portfolio project. The goal was not just to train a model, but to build the complete engineering infrastructure around it — data versioning, experiment tracking, model serving, and containerized deployment.
+A full MLOps pipeline for email spam classification — built to demonstrate end-to-end ML engineering practices including data versioning, experiment tracking, containerized serving, CI/CD, and caching. Designed to reflect real-world engineering workflows rather than a simple notebook model.
 
 ## Tech Stack
 
@@ -10,7 +10,10 @@ A production-grade spam classification system built as a full MLOps portfolio pr
 | Data Versioning | DVC |
 | Experiment Tracking | MLflow |
 | Model Serving | FastAPI + Uvicorn |
+| Caching | Redis |
 | Containerization | Docker + Docker Compose |
+| CI/CD | GitHub Actions |
+| Load Testing | Locust |
 | Version Control | Git + GitHub |
 
 ## Project Architecture
@@ -25,9 +28,15 @@ email_classifier/
 │   ├── data_prep.py          # Custom sklearn transformers (pipeline)
 │   ├── fetch_data.py         # Data download script
 │   └── app.py                # FastAPI serving application
+├── tests/
+│   └── test_data_prep.py     # Unit tests (pytest)
+├── .github/
+│   └── workflows/
+│       └── ci.yml            # GitHub Actions CI/CD pipeline
 ├── Dockerfile                # FastAPI container
 ├── Dockerfile.mlflow         # MLflow server container
-├── docker-compose.yml        # Orchestrates both services
+├── docker-compose.yml        # Orchestrates all services
+├── locustfile.py             # Load testing configuration
 ├── requirements.txt          # Production dependencies
 └── data/raw.dvc              # DVC pointer to raw data
 ```
@@ -37,9 +46,11 @@ email_classifier/
 ```
 Raw Email Text
       ↓
-EmailToWordCountTransformer   (strip headers, lowercase, replace URLs/numbers, stemming)
+EmailToWordCountTransformer
+(strip headers · lowercase · replace URLs/numbers · stemming)
       ↓
-WordCounterToVectorTransformer  (top-1000 vocabulary → sparse matrix)
+WordCounterToVectorTransformer
+(top-1000 vocabulary → sparse matrix)
       ↓
 LogisticRegression
       ↓
@@ -49,8 +60,7 @@ LogisticRegression
 ## Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose installed
-- MLflow tracking database (`mlflow.db`) in project root
+- Docker & Docker Compose
 
 ### Run with Docker Compose
 ```bash
@@ -59,7 +69,11 @@ cd email-spam-classifier
 docker compose up
 ```
 
-The API will be available at `http://127.0.0.1:8000`
+| Service | URL |
+|---------|-----|
+| API | http://127.0.0.1:8000 |
+| API Docs (Swagger) | http://127.0.0.1:8000/docs |
+| MLflow UI | http://127.0.0.1:5000 |
 
 ### Test the API
 ```bash
@@ -68,32 +82,43 @@ curl -X POST http://127.0.0.1:8000/predict \
   -d '{"text": "CLICK HERE to win FREE money now!!!"}'
 ```
 
-Expected response:
 ```json
 {"label": "spam", "is_spam": true}
 ```
 
-### API Documentation
-Interactive Swagger UI available at: `http://127.0.0.1:8000/docs`
+### Run Tests
+```bash
+pip install pytest
+pytest tests/ -v
+```
+
+### Load Testing
+```bash
+pip install locust
+locust --host=http://127.0.0.1:8000
+```
+Open http://localhost:8089 to run the load test from the browser.
 
 ## MLOps Pipeline
 
 ### 1. Data Versioning (DVC)
-Raw email data from [Apache SpamAssassin](https://spamassassin.apache.org/old/publiccorpus/) is tracked with DVC, keeping the Git repository lightweight while maintaining full data reproducibility.
+Raw email data from [Apache SpamAssassin](https://spamassassin.apache.org/old/publiccorpus/) is tracked with DVC — keeping Git lightweight while maintaining full data reproducibility.
 
 ```bash
-dvc pull   # fetch raw data from remote storage
+dvc pull   # fetch raw data
 dvc push   # push new data versions
 ```
 
 ### 2. Experiment Tracking (MLflow)
-Every training run is logged with MLflow — hyperparameters, metrics (precision/recall), and the serialized model artifact.
+Every training run is logged with MLflow — hyperparameters, metrics, and serialized model artifacts.
 
-- **Precision:** ~96%
-- **Recall:** ~94%
+| Metric | Value |
+|--------|-------|
+| Precision | ~96% |
+| Recall | ~94% |
 
-### 3. Model Serving (FastAPI)
-A REST API exposes the trained model for real-time inference. The pipeline and model are loaded once at startup from MLflow.
+### 3. Model Serving (FastAPI + Redis)
+A REST API exposes the trained model for real-time inference. Redis caches prediction results to reduce load and latency — with graceful degradation if Redis is unavailable.
 
 ```
 POST /predict  →  { "text": "..." }  →  { "label": "spam/ham", "is_spam": true/false }
@@ -102,26 +127,43 @@ GET  /docs     →  Swagger UI
 ```
 
 ### 4. Containerization (Docker Compose)
-Two isolated services communicate over Docker's internal network:
+Three isolated services communicate over Docker's internal network:
 
 ```
-[FastAPI container :8000] ──→ [MLflow container :5000]
-         ↑
-    your browser
+[FastAPI :8000] ──→ [MLflow :5000]
+      ↕
+[Redis :6379]
+      ↑
+ your browser
 ```
+
+### 5. CI/CD (GitHub Actions)
+Every push triggers an automated pipeline:
+1. Run unit tests (pytest)
+2. Build Docker images (FastAPI + MLflow)
+
+If tests fail, the Docker build is skipped.
+
+### 6. Load Testing (Locust)
+Tested at **405 concurrent users** with:
+- **~196 RPS** (requests per second)
+- **5ms** median response time
+- **0% failure rate**
 
 ## Project Stages
 
 | Stage | Branch | Description |
 |-------|--------|-------------|
-| Setup | `main` | Project structure, .gitignore, virtual environment |
+| Setup | `main` | Project structure, virtual environment |
 | Data versioning | `feature/dvc-setup` | DVC init, remote storage, data tracking |
-| Experiment tracking | `feature/mlflow-tracking` | MLflow integration, model & pipeline logging |
-| Model serving | `feature/fastapi-serving` | FastAPI endpoint, preprocessing pipeline serving |
-| Containerization | `feature/docker` | Dockerfile, docker-compose, multi-container setup |
+| Experiment tracking | `feature/mlflow-tracking` | MLflow integration, model logging |
+| Model serving | `feature/fastapi-serving` | FastAPI endpoint, pipeline serving |
+| Containerization | `feature/docker` | Dockerfile, docker-compose, multi-service setup |
+| CI/CD | `feature/ci-cd` | GitHub Actions, pytest, Docker build check |
+| Caching | `feature/redis-caching` | Redis caching with graceful degradation |
 
 ## Dataset
 
 [Apache SpamAssassin Public Corpus](https://spamassassin.apache.org/old/publiccorpus/)
-- `easy_ham`: ~2500 legitimate emails
-- `spam`: ~500 spam emails
+- `easy_ham` — ~2500 legitimate emails
+- `spam` — ~500 spam emails
